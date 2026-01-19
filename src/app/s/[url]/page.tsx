@@ -14,7 +14,7 @@ type PublicQuestion = {
   id: string;
   text: string;
   details?: string;
-   image?: string | null; 
+  image?: string | null;
   type: "radio" | "checkbox" | "text";
   options: PublicOption[];
 };
@@ -38,7 +38,7 @@ type DisclaimerProps = {
 function Disclaimer({ onClose }: DisclaimerProps) {
   const [checked, setChecked] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
-   const { data: uiConfig, isLoading, error } = useQuery<SurveyUIConfig, Error>({
+  const { data: uiConfig, isLoading, error } = useQuery<SurveyUIConfig, Error>({
     queryKey: ["ui-config", "survey"],
     queryFn: async () => {
       const res = await fetch(
@@ -87,7 +87,7 @@ function Disclaimer({ onClose }: DisclaimerProps) {
       <div className=" rounded-lg p-6 max-w-4xl w-full mx-4 shadow-lg bg-[#fff]/80">
         <h2 className="text-lg font-bold mb-4 text-gray-900">DISCLAIMER</h2>
         <p className="text-sm text-gray-800 mb-4 leading-snug">
-         {uiConfig?.config?.disclaimer.text}
+          {uiConfig?.config?.disclaimer.text}
         </p>
         <label className="flex items-center mb-4 space-x-2">
           <input
@@ -130,13 +130,13 @@ export default function PublicSurveyPage() {
   });
 
   const { data: uiConfig, isLoading: uiLoading, error: uiError } = useQuery<SurveyUIConfig, Error>({
-  queryKey: ["ui-config", "survey"],
-  queryFn: async () => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ui-config/survey`);
-    if (!res.ok) throw new Error("Failed to fetch UI config");
-    return res.json();
-  },
-});
+    queryKey: ["ui-config", "survey"],
+    queryFn: async () => {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ui-config/survey`);
+      if (!res.ok) throw new Error("Failed to fetch UI config");
+      return res.json();
+    },
+  });
 
 
   // console.log(data);
@@ -207,8 +207,8 @@ export default function PublicSurveyPage() {
           const arr = Array.isArray(val)
             ? val
             : typeof val === "string"
-            ? [val]
-            : [];
+              ? [val]
+              : [];
           return arr.length > 0;
         }
         return false;
@@ -238,63 +238,63 @@ export default function PublicSurveyPage() {
   const onBack = () => setIndex((i) => Math.max(i - 1, 0));
   const onSubmit = () => submit.mutate();
 
- const buildSections = () => {
-  if (!data) return [];
+  const buildSections = () => {
+    if (!data) return [];
 
-  return data.segments
-    .map((seg, sIdx) => {
-      const rows = seg.questions.map((qq) => {
-        let answersArr: string[] = [];
-        let risksArr: ("green" | "yellow" | "red")[] = [];
+    return data.segments
+      .map((seg, sIdx) => {
+        const rows = seg.questions.map((qq) => {
+          let answersArr: string[] = [];
+          let risksArr: ("green" | "yellow" | "red")[] = [];
 
-        // -------- TEXT QUESTION --------
-        if (qq.type === "text") {
-          const a = String((answers[qq.id] as string) || "").trim();
-          if (a) {
-            answersArr = [a];
-            risksArr = ["green"]; // text ko safe maan rahe
-          }
-        }
-
-        // -------- RADIO / CHECKBOX --------
-        if (qq.type === "radio" || qq.type === "checkbox") {
-          const selectedIds = currentArr(qq.id); // selected option ids
-
-          // 🔥 IMPORTANT: ALL options included
-          qq.options.forEach((opt) => {
-            answersArr.push(opt.text);
-
-            if (selectedIds.includes(opt.id)) {
-              // ✅ selected → actual risk
-              const r = (opt.risk || "").toLowerCase();
-              risksArr.push(
-                r === "green"
-                  ? "green"
-                  : r === "yellow" || r === "amber"
-                  ? "yellow"
-                  : "red"
-              );
-            } else {
-              // ❌ unselected → RED
-              risksArr.push("red");
+          // -------- TEXT QUESTION --------
+          if (qq.type === "text") {
+            const a = String((answers[qq.id] as string) || "").trim();
+            if (a) {
+              answersArr = [a];
+              risksArr = ["green"]; // text ko safe maan rahe
             }
-          });
-        }
+          }
+
+          // -------- RADIO / CHECKBOX --------
+          if (qq.type === "radio" || qq.type === "checkbox") {
+            const selectedIds = currentArr(qq.id); // selected option ids
+
+            // 🔥 IMPORTANT: ALL options included
+            qq.options.forEach((opt) => {
+              answersArr.push(opt.text);
+
+              if (selectedIds.includes(opt.id)) {
+                // ✅ selected → actual risk
+                const r = (opt.risk || "").toLowerCase();
+                risksArr.push(
+                  r === "green"
+                    ? "green"
+                    : r === "yellow" || r === "amber"
+                      ? "yellow"
+                      : "red"
+                );
+              } else {
+                // ❌ unselected → RED
+                risksArr.push("red");
+              }
+            });
+          }
+
+          return {
+            question: qq.text,
+            answers: answersArr,
+            risks: risksArr,
+          };
+        });
 
         return {
-          question: qq.text,
-          answers: answersArr,
-          risks: risksArr,
+          title: `Segment ${sIdx + 1}: ${seg.title || ""}`,
+          rows,
         };
-      });
-
-      return {
-        title: `Segment ${sIdx + 1}: ${seg.title || ""}`,
-        rows,
-      };
-    })
-    .filter((sec) => sec.rows.length > 0);
-};
+      })
+      .filter((sec) => sec.rows.length > 0);
+  };
 
   const handleDownloadPdf = async () => {
     try {
@@ -389,17 +389,17 @@ export default function PublicSurveyPage() {
           </h1>
 
 
-            {/*images*/ }
-       {q.image ? (
-  <img
-    src={`${process.env.NEXT_PUBLIC_API_URL}${q.image}`}
-    alt="Question image"
-    className="max-h-[250px] w-auto mx-auto rounded-lg shadow-md mt-4 object-contain"
-    loading="lazy"
-  />
-) : (
-  <div className="">  </div>
-)}
+          {/*images*/}
+          {q.image ? (
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL}${q.image}`}
+              alt="Question image"
+              className="max-h-[250px] w-auto mx-auto rounded-lg shadow-md mt-4 object-contain"
+              loading="lazy"
+            />
+          ) : (
+            <div className="">  </div>
+          )}
 
 
           {!!details && (
@@ -418,9 +418,8 @@ export default function PublicSurveyPage() {
                     return (
                       <label
                         key={o.id}
-                        className={`block cursor-pointer bg-[#dde7f5] px-6 py-4 transition-colors ${
-                          i > 0 ? "border-t-2 border-[#c6e0e0]" : ""
-                        }`}
+                        className={`block cursor-pointer bg-[#dde7f5] px-6 py-4 transition-colors ${i > 0 ? "border-t-2 border-[#c6e0e0]" : ""
+                          }`}
                         onClick={() => {
                           if (q.type === "radio" || q.type === "checkbox") {
                             toggleSelect(q.id, o.id, q.type);
@@ -429,11 +428,10 @@ export default function PublicSurveyPage() {
                       >
                         <div className="flex items-center gap-5">
                           <span
-                            className={`inline-flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                              selected
-                                ? "bg-[#0a9b8c] border-white"
-                                : "bg-[#e7efef] border-transparent"
-                            }`}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-full border-2 ${selected
+                              ? "bg-[#0a9b8c] border-white"
+                              : "bg-[#e7efef] border-transparent"
+                              }`}
                           >
                             {selected ? (
                               <svg
@@ -462,9 +460,8 @@ export default function PublicSurveyPage() {
                     return (
                       <label
                         key={o.id}
-                        className={`block cursor-pointer bg-[#dde7f5] px-6 py-4 transition-colors ${
-                          i > 0 ? "border-t-2 border-[#c6e0e0]" : ""
-                        }`}
+                        className={`block cursor-pointer bg-[#dde7f5] px-6 py-4 transition-colors ${i > 0 ? "border-t-2 border-[#c6e0e0]" : ""
+                          }`}
                         onClick={() => {
                           if (q.type === "radio" || q.type === "checkbox") {
                             toggleSelect(q.id, o.id, q.type);
@@ -473,15 +470,13 @@ export default function PublicSurveyPage() {
                       >
                         <div className="flex items-center gap-5">
                           <span
-                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md ${
-                              checked ? "bg-[#0a9b8c]" : "bg-[#e7efef]"
-                            }`}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md ${checked ? "bg-[#0a9b8c]" : "bg-[#e7efef]"
+                              }`}
                           >
                             <svg
                               viewBox="0 0 24 24"
-                              className={`h-5 w-5 ${
-                                checked ? "text-white" : "text-[#c9d6d6]"
-                              }`}
+                              className={`h-5 w-5 ${checked ? "text-white" : "text-[#c9d6d6]"
+                                }`}
                               fill="currentColor"
                             >
                               <path d="M9 16.17l-3.88-3.88-1.42 1.41L9 19 20.3 7.71l-1.41-1.41z" />
@@ -528,11 +523,10 @@ export default function PublicSurveyPage() {
                   <button
                     onClick={onBack}
                     disabled={index === 0}
-                    className={`rounded-xl px-5 py-2 text-white shadow-md ${
-                      index === 0
-                        ? "bg-gray-400"
-                        : "bg-gray-600 hover:brightness-110"
-                    }`}
+                    className={`rounded-xl px-5 py-2 text-white shadow-md ${index === 0
+                      ? "bg-gray-400"
+                      : "bg-gray-600 hover:brightness-110"
+                      }`}
                   >
                     Back
                   </button>
@@ -540,11 +534,10 @@ export default function PublicSurveyPage() {
                   <button
                     onClick={onNext}
                     disabled={!answeredThis || isLast}
-                    className={`rounded-xl px-5 py-2 text-white shadow-md ${
-                      !answeredThis || isLast
-                        ? "bg-gray-400"
-                        : "bg-[#134a80] hover:brightness-110"
-                    }`}
+                    className={`rounded-xl px-5 py-2 text-white shadow-md ${!answeredThis || isLast
+                      ? "bg-gray-400"
+                      : "bg-[#134a80] hover:brightness-110"
+                      }`}
                   >
                     Next
                   </button>
@@ -553,11 +546,10 @@ export default function PublicSurveyPage() {
                     <button
                       onClick={onSubmit}
                       disabled={submit.isPending}
-                      className={`rounded-xl px-5 py-2 text-white shadow-md ${
-                        submit.isPending
-                          ? "bg-gray-400"
-                          : "bg-[#2aa85b] hover:brightness-110"
-                      }`}
+                      className={`rounded-xl px-5 py-2 text-white shadow-md ${submit.isPending
+                        ? "bg-gray-400"
+                        : "bg-[#2aa85b] hover:brightness-110"
+                        }`}
                     >
                       {submit.isPending ? "Submitting…" : "Submit"}
                     </button>
@@ -575,7 +567,7 @@ export default function PublicSurveyPage() {
           <span className="text-sm">Powered by</span>
 
           <img
-            src={uiConfig?.config?.poweredBy.logo??""}
+            src={uiConfig?.config?.poweredBy.logo ?? ""}
             alt="Launchalot"
             className="h-14 w-auto object-contain"
           />
@@ -588,7 +580,7 @@ export default function PublicSurveyPage() {
           companyName={data.companyName}
           onDownload={handleDownloadPdf}
           bgimg={uiConfig?.config?.backgroundImage ?? ""}
-          footerlogo={uiConfig?.config?.poweredBy.logo??""}
+          footerlogo={uiConfig?.config?.poweredBy.logo ?? ""}
         />
       )}
     </div>
