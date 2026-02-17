@@ -57,7 +57,7 @@ export default function DashboardPage() {
           icon={<HelpCircle className="h-12 w-12 text-[#0c5b67]" />}
           title="Survey Questions"
           value={fmt(data?.questionsCount)}
-          href="/surveys"
+          href="/questions"
         />
         <Tile
           icon={<BarChart2 className="h-12 w-12 text-[#0c5b67]" />}

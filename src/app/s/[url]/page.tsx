@@ -239,94 +239,99 @@ export default function PublicSurveyPage() {
   const onSubmit = () => submit.mutate();
 
   const buildSections = () => {
-    if (!data) return [];
+  if (!data) return [];
 
-    return data.segments
-      .map((seg, sIdx) => {
-        const rows = seg.questions.map((qq) => {
-          let answersArr: string[] = [];
-          let risksArr: ("green" | "yellow" | "red")[] = [];
+  return data.segments
+    .map((seg, sIdx) => {
+      const rows = seg.questions.map((qq) => {
+        let answersArr: string[] = [];
+        let risksArr: ("green" | "yellow" | "red")[] = [];
+        let selectedArr: boolean[] = []; // 🔥 NEW
 
-          // -------- TEXT QUESTION --------
-          if (qq.type === "text") {
-            const a = String((answers[qq.id] as string) || "").trim();
-            if (a) {
-              answersArr = [a];
-              risksArr = ["green"]; // text ko safe maan rahe
+        // -------- TEXT QUESTION --------
+        if (qq.type === "text") {
+          const a = String((answers[qq.id] as string) || "").trim();
+          if (a) {
+            answersArr = [a];
+            risksArr = ["green"];
+            selectedArr = [true]; // text always selected
+          }
+        }
+
+        // -------- RADIO / CHECKBOX --------
+        if (qq.type === "radio" || qq.type === "checkbox") {
+          const selectedIds = currentArr(qq.id);
+
+          qq.options.forEach((opt) => {
+            const isSelected = selectedIds.includes(opt.id);
+
+            answersArr.push(opt.text);
+            selectedArr.push(isSelected);
+
+            if (isSelected) {
+              const r = (opt.risk || "").toLowerCase();
+              risksArr.push(
+                r === "green"
+                  ? "green"
+                  : r === "yellow" || r === "amber"
+                  ? "yellow"
+                  : "red"
+              );
+            } else {
+              risksArr.push("red"); // unselected default red
             }
-          }
-
-          // -------- RADIO / CHECKBOX --------
-          if (qq.type === "radio" || qq.type === "checkbox") {
-            const selectedIds = currentArr(qq.id); // selected option ids
-
-            // 🔥 IMPORTANT: ALL options included
-            qq.options.forEach((opt) => {
-              answersArr.push(opt.text);
-
-              if (selectedIds.includes(opt.id)) {
-                // ✅ selected → actual risk
-                const r = (opt.risk || "").toLowerCase();
-                risksArr.push(
-                  r === "green"
-                    ? "green"
-                    : r === "yellow" || r === "amber"
-                      ? "yellow"
-                      : "red"
-                );
-              } else {
-                // ❌ unselected → RED
-                risksArr.push("red");
-              }
-            });
-          }
-
-          return {
-            question: qq.text,
-            answers: answersArr,
-            risks: risksArr,
-          };
-        });
+          });
+        }
 
         return {
-          title: `Segment ${sIdx + 1}: ${seg.title || ""}`,
-          rows,
+          question: qq.text,
+          answers: answersArr,
+          risks: risksArr,
+          selected: selectedArr, // 🔥 IMPORTANT
         };
-      })
-      .filter((sec) => sec.rows.length > 0);
-  };
-
-  const handleDownloadPdf = async () => {
-    try {
-      const sections = buildSections();
-
-      const res = await fetch(`${API_BASE}/public/report.pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName: data?.companyName || "",
-          companyLogo: data?.companyLogos || data?.companyLogo || "",
-          sections,
-        }),
       });
 
-      if (!res.ok) throw new Error("PDF build failed");
+      return {
+        title: `Segment ${sIdx + 1}: ${seg.title || ""}`,
+        rows,
+      };
+    })
+    .filter((sec) => sec.rows.length > 0);
+};
 
-      const blob = await res.blob();
-      const urlObj = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = urlObj;
-      a.download = `${(data?.companyName || "report")
-        .replace(/[^a-z0-9-_]/gi, "_")
-        .toLowerCase()}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(urlObj);
-    } catch (e) {
-      console.error(e);
-    }
-  };
+const handleDownloadPdf = async () => {
+  try {
+    const sections = buildSections();
+
+    const res = await fetch(`${API_BASE}/public/report.pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyName: data?.companyName || "",
+        companyLogo: data?.companyLogos || data?.companyLogo || "",
+        sections,
+      }),
+    });
+
+    if (!res.ok) throw new Error("PDF build failed");
+
+    const blob = await res.blob();
+    const urlObj = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = urlObj;
+    a.download = `${(data?.companyName || "report")
+      .replace(/[^a-z0-9-_]/gi, "_")
+      .toLowerCase()}.pdf`;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(urlObj);
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 
   if (isLoading) {
     return (
