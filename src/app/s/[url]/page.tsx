@@ -246,80 +246,55 @@ export default function PublicSurveyPage() {
         const rows = seg.questions.map((qq) => {
           let answersArr: string[] = [];
           let risksArr: ("green" | "yellow" | "red")[] = [];
-          let selectedArr: boolean[] = [];
 
           // -------- TEXT QUESTION --------
           if (qq.type === "text") {
             const a = String((answers[qq.id] as string) || "").trim();
             if (a) {
               answersArr = [a];
-              risksArr = ["green"];
-              selectedArr = [true];
+              risksArr = ["green"]; // text ko safe maan rahe
             }
           }
 
-          // -------- RADIO --------
-          if (qq.type === "radio") {
-            const selectedIds = currentArr(qq.id);
+          // -------- RADIO / CHECKBOX --------
+          if (qq.type === "radio" || qq.type === "checkbox") {
+            const selectedIds = currentArr(qq.id); // selected option ids
 
-            const selectedOpt = qq.options.find((opt) =>
-              selectedIds.includes(opt.id)
-            );
-
-            if (selectedOpt) {
-              answersArr = [selectedOpt.text];
-              selectedArr = [true];
-
-              const r = (selectedOpt.risk || "").toLowerCase();
-              risksArr = [
-                r === "green"
-                  ? "green"
-                  : r === "yellow" || r === "amber"
-                    ? "yellow"
-                    : "red",
-              ];
-            }
-          }
-
-          // -------- CHECKBOX --------
-          if (qq.type === "checkbox") {
-            const selectedIds = currentArr(qq.id);
-
+            // 🔥 IMPORTANT: ALL options included
             qq.options.forEach((opt) => {
-              const isSelected = selectedIds.includes(opt.id);
-
               answersArr.push(opt.text);
-              selectedArr.push(isSelected);
 
-              const r = (opt.risk || "").toLowerCase();
-
-              risksArr.push(
-                r === "green"
-                  ? "green"
-                  : r === "yellow" || r === "amber"
-                    ? "yellow"
-                    : "red"
-              );
+              if (selectedIds.includes(opt.id)) {
+                // ✅ selected → actual risk
+                const r = (opt.risk || "").toLowerCase();
+                risksArr.push(
+                  r === "green"
+                    ? "green"
+                    : r === "yellow" || r === "amber"
+                      ? "yellow"
+                      : "red"
+                );
+              } else {
+                // ❌ unselected → RED
+                risksArr.push("red");
+              }
             });
           }
-
 
           return {
             question: qq.text,
             answers: answersArr,
             risks: risksArr,
-            selected: selectedArr,
           };
         });
 
         return {
-          title: seg.title || "",
+          title: `Segment ${sIdx + 1}: ${seg.title || ""}`,
           rows,
         };
       })
       .filter((sec) => sec.rows.length > 0);
   };
-
 
   const handleDownloadPdf = async () => {
     try {
@@ -344,7 +319,6 @@ export default function PublicSurveyPage() {
       a.download = `${(data?.companyName || "report")
         .replace(/[^a-z0-9-_]/gi, "_")
         .toLowerCase()}.pdf`;
-
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -353,7 +327,6 @@ export default function PublicSurveyPage() {
       console.error(e);
     }
   };
-
 
   if (isLoading) {
     return (
