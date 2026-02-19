@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import client from "@/lib/client";
+import client from "../../../lib/client";
 import ThankYouCard from "@/components/ThankYouCard";
 import { SurveyUIConfig } from "@/types/uiConfig";
 
@@ -76,7 +76,7 @@ function Disclaimer({ onClose }: DisclaimerProps) {
     <div
       style={{
         backgroundImage:
-          `radial-gradient(ellipse at bottom, #2a95c4b5, #0d1b2af2), url(${uiConfig?.backgroundImage})`,
+          `radial-gradient(ellipse at bottom, #2a95c4b5, #0d1b2af2), url(${uiConfig?.config?.backgroundImage})`,
         backgroundSize: "cover, cover",
         backgroundPosition: "center, center",
         backgroundRepeat: "no-repeat, no-repeat",
@@ -87,7 +87,7 @@ function Disclaimer({ onClose }: DisclaimerProps) {
       <div className=" rounded-lg p-6 max-w-4xl w-full mx-4 shadow-lg bg-[#fff]/80">
         <h2 className="text-lg font-bold mb-4 text-gray-900">DISCLAIMER</h2>
         <p className="text-sm text-gray-800 mb-4 leading-snug">
-          {uiConfig?.disclaimer.text}
+          {uiConfig?.config?.disclaimer.text}
         </p>
         <label className="flex items-center mb-4 space-x-2">
           <input
@@ -96,7 +96,7 @@ function Disclaimer({ onClose }: DisclaimerProps) {
             onChange={(e) => setChecked(e.target.checked)}
             className="w-4 h-4"
           />
-          <span className="text-sm text-gray-800">{uiConfig?.checkbox.text} </span>
+          <span className="text-sm text-gray-800">{uiConfig?.config?.checkbox.text} </span>
         </label>
         <div className="flex justify-end space-x-2">
           <button
@@ -111,7 +111,7 @@ function Disclaimer({ onClose }: DisclaimerProps) {
         <p className="text-white text-sm opacity-80">
           Powered by&nbsp;
           <img
-            src={uiConfig?.poweredBy.logo}
+            src={uiConfig?.config?.poweredBy.logo}
             alt="logo"
             className="inline-block h-12 align-middle"
           />
@@ -240,48 +240,60 @@ export default function PublicSurveyPage() {
 
   const buildSections = () => {
     if (!data) return [];
+
     return data.segments
       .map((seg, sIdx) => {
         const rows = seg.questions.map((qq) => {
           let answersArr: string[] = [];
-          let risksArr: ("green" | "yellow" | "red" | undefined)[] = [];
+          let risksArr: ("green" | "yellow" | "red")[] = [];
+          let selectedArr: boolean[] = []; // 🔥 NEW
 
+          // -------- TEXT QUESTION --------
           if (qq.type === "text") {
             const a = String((answers[qq.id] as string) || "").trim();
-            answersArr = a ? [a] : [];
-          } else if (qq.type === "radio" || qq.type === "checkbox") {
-            const sel = currentArr(qq.id);
-            const chosen = qq.options.filter((o) => sel.includes(o.id));
-            answersArr = chosen.map((o) => o.text);
-            risksArr = chosen.map((o) => {
-              const r = (o.risk || "").toLowerCase();
-              return r === "red"
-                ? "red"
-                : r === "yellow" || r === "amber"
-                  ? "yellow"
-                  : r === "green"
+            if (a) {
+              answersArr = [a];
+              risksArr = ["green"];
+              selectedArr = [true]; // text always selected
+            }
+          }
+
+          // -------- RADIO / CHECKBOX --------
+          if (qq.type === "radio" || qq.type === "checkbox") {
+            const selectedIds = currentArr(qq.id);
+
+            qq.options.forEach((opt) => {
+              const isSelected = selectedIds.includes(opt.id);
+
+              answersArr.push(opt.text);
+              selectedArr.push(isSelected);
+
+              if (isSelected) {
+                const r = (opt.risk || "").toLowerCase();
+                risksArr.push(
+                  r === "green"
                     ? "green"
-                    : undefined;
+                    : r === "yellow" || r === "amber"
+                      ? "yellow"
+                      : "red"
+                );
+              } else {
+                risksArr.push("red"); // unselected default red
+              }
             });
           }
 
           return {
             question: qq.text,
-            answer: answersArr.join(", "),
             answers: answersArr,
             risks: risksArr,
+            selected: selectedArr, // 🔥 IMPORTANT
           };
         });
 
-        const filtered = rows.filter(
-          (r) =>
-            (r.answers && r.answers.length > 0) ||
-            (typeof r.answer === "string" && r.answer.trim().length > 0)
-        );
-
         return {
           title: `Segment ${sIdx + 1}: ${seg.title || ""}`,
-          rows: filtered,
+          rows,
         };
       })
       .filter((sec) => sec.rows.length > 0);
@@ -310,6 +322,7 @@ export default function PublicSurveyPage() {
       a.download = `${(data?.companyName || "report")
         .replace(/[^a-z0-9-_]/gi, "_")
         .toLowerCase()}.pdf`;
+
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -318,6 +331,7 @@ export default function PublicSurveyPage() {
       console.error(e);
     }
   };
+
 
   if (isLoading) {
     return (
@@ -341,7 +355,7 @@ export default function PublicSurveyPage() {
       className="relative min-h-screen overflow-hidden"
       style={{
         backgroundImage:
-          `radial-gradient(ellipse at bottom, #2a95c4b5, #0d1b2af2), url(${uiConfig?.backgroundImage})`,
+          `radial-gradient(ellipse at bottom, #2a95c4b5, #0d1b2af2), url(${uiConfig?.config?.backgroundImage})`,
         backgroundSize: "cover, cover",
         backgroundPosition: "center, center",
         backgroundRepeat: "no-repeat, no-repeat",
@@ -558,7 +572,7 @@ export default function PublicSurveyPage() {
           <span className="text-sm">Powered by</span>
 
           <img
-            src={uiConfig?.poweredBy.logo ?? ""}
+            src={uiConfig?.config?.poweredBy.logo ?? ""}
             alt="Launchalot"
             className="h-14 w-auto object-contain"
           />
@@ -570,8 +584,8 @@ export default function PublicSurveyPage() {
           logos={logos}
           companyName={data.companyName}
           onDownload={handleDownloadPdf}
-          bgimg={uiConfig?.backgroundImage ?? ""}
-          footerlogo={uiConfig?.poweredBy.logo ?? ""}
+          bgimg={uiConfig?.config?.backgroundImage ?? ""}
+          footerlogo={uiConfig?.config?.poweredBy.logo ?? ""}
         />
       )}
     </div>
