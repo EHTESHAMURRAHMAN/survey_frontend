@@ -237,38 +237,54 @@ export default function PublicSurveyPage() {
   const onNext = () => setIndex((i) => Math.min(i + 1, questions.length - 1));
   const onBack = () => setIndex((i) => Math.max(i - 1, 0));
   const onSubmit = () => submit.mutate();
-
   const buildSections = () => {
     if (!data) return [];
 
     return data.segments
-      .map((seg, sIdx) => {
+      .map((seg) => {
         const rows = seg.questions.map((qq) => {
           let answersArr: string[] = [];
           let risksArr: ("green" | "yellow" | "red")[] = [];
-          let selectedArr: boolean[] = []; // 🔥 NEW
 
-          // -------- TEXT QUESTION --------
+          // -------- TEXT --------
           if (qq.type === "text") {
             const a = String((answers[qq.id] as string) || "").trim();
             if (a) {
               answersArr = [a];
               risksArr = ["green"];
-              selectedArr = [true]; // text always selected
             }
           }
 
-          // -------- RADIO / CHECKBOX --------
-          if (qq.type === "radio" || qq.type === "checkbox") {
+          // -------- RADIO (only selected) --------
+          if (qq.type === "radio") {
+            const selectedIds = currentArr(qq.id);
+
+            const selectedOpt = qq.options.find((opt) =>
+              selectedIds.includes(opt.id)
+            );
+
+            if (selectedOpt) {
+              answersArr = [selectedOpt.text];
+
+              const r = (selectedOpt.risk || "").toLowerCase();
+              risksArr = [
+                r === "green"
+                  ? "green"
+                  : r === "yellow" || r === "amber"
+                    ? "yellow"
+                    : "red",
+              ];
+            }
+          }
+
+          // -------- CHECKBOX (ONLY SELECTED) --------
+          if (qq.type === "checkbox") {
             const selectedIds = currentArr(qq.id);
 
             qq.options.forEach((opt) => {
-              const isSelected = selectedIds.includes(opt.id);
+              if (selectedIds.includes(opt.id)) {
+                answersArr.push(opt.text);
 
-              answersArr.push(opt.text);
-              selectedArr.push(isSelected);
-
-              if (isSelected) {
                 const r = (opt.risk || "").toLowerCase();
                 risksArr.push(
                   r === "green"
@@ -277,8 +293,6 @@ export default function PublicSurveyPage() {
                       ? "yellow"
                       : "red"
                 );
-              } else {
-                risksArr.push("red"); // unselected default red
               }
             });
           }
@@ -287,17 +301,101 @@ export default function PublicSurveyPage() {
             question: qq.text,
             answers: answersArr,
             risks: risksArr,
-            selected: selectedArr, // 🔥 IMPORTANT
           };
         });
 
         return {
-          title: `Segment ${sIdx + 1}: ${seg.title || ""}`,
+          title: seg.title || "",
           rows,
         };
       })
-      .filter((sec) => sec.rows.length > 0);
+      .filter((sec) =>
+        sec.rows.some((r) => r.answers && r.answers.length > 0)
+      );
   };
+
+  // const buildSections = () => {
+  //   if (!data) return [];
+
+  //   return data.segments
+  //     .map((seg, sIdx) => {
+  //       const rows = seg.questions.map((qq) => {
+  //         let answersArr: string[] = [];
+  //         let risksArr: ("green" | "yellow" | "red")[] = [];
+  //         let selectedArr: boolean[] = [];
+
+  //         // -------- TEXT QUESTION --------
+  //         if (qq.type === "text") {
+  //           const a = String((answers[qq.id] as string) || "").trim();
+  //           if (a) {
+  //             answersArr = [a];
+  //             risksArr = ["green"];
+  //             selectedArr = [true];
+  //           }
+  //         }
+
+  //         // -------- RADIO --------
+  //         if (qq.type === "radio") {
+  //           const selectedIds = currentArr(qq.id);
+
+  //           const selectedOpt = qq.options.find((opt) =>
+  //             selectedIds.includes(opt.id)
+  //           );
+
+  //           if (selectedOpt) {
+  //             answersArr = [selectedOpt.text];
+  //             selectedArr = [true];
+
+  //             const r = (selectedOpt.risk || "").toLowerCase();
+  //             risksArr = [
+  //               r === "green"
+  //                 ? "green"
+  //                 : r === "yellow" || r === "amber"
+  //                   ? "yellow"
+  //                   : "red",
+  //             ];
+  //           }
+  //         }
+
+  //         // -------- CHECKBOX --------
+  //         if (qq.type === "checkbox") {
+  //           const selectedIds = currentArr(qq.id);
+
+  //           qq.options.forEach((opt) => {
+  //             const isSelected = selectedIds.includes(opt.id);
+
+  //             answersArr.push(opt.text);
+  //             selectedArr.push(isSelected);
+
+  //             const r = (opt.risk || "").toLowerCase();
+
+  //             risksArr.push(
+  //               r === "green"
+  //                 ? "green"
+  //                 : r === "yellow" || r === "amber"
+  //                   ? "yellow"
+  //                   : "red"
+  //             );
+  //           });
+  //         }
+
+
+  //         return {
+  //           question: qq.text,
+  //           answers: answersArr,
+  //           risks: risksArr,
+  //           selected: selectedArr,
+  //         };
+  //       });
+
+  //       return {
+  //         title: seg.title || "",
+  //         rows,
+  //       };
+  //     })
+  //     .filter((sec) => sec.rows.length > 0);
+  // };
+
 
   const handleDownloadPdf = async () => {
     try {
@@ -591,3 +689,4 @@ export default function PublicSurveyPage() {
     </div>
   );
 }
+
