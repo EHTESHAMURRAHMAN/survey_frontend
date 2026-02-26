@@ -397,6 +397,7 @@ export default function PublicSurveyPage() {
   // };
 
 
+
   const handleDownloadPdf = async () => {
     try {
       const sections = buildSections();
@@ -405,6 +406,7 @@ export default function PublicSurveyPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          surveyName: data?.surveyName || "",   // ✅ ADD THIS
           companyName: data?.companyName || "",
           companyLogo: data?.companyLogos || data?.companyLogo || "",
           sections,
@@ -415,6 +417,7 @@ export default function PublicSurveyPage() {
 
       const blob = await res.blob();
       const urlObj = window.URL.createObjectURL(blob);
+
       const a = document.createElement("a");
       a.href = urlObj;
       a.download = `${(data?.companyName || "report")
@@ -429,6 +432,38 @@ export default function PublicSurveyPage() {
       console.error(e);
     }
   };
+  // const handleDownloadPdf = async () => {
+  //   try {
+  //     const sections = buildSections();
+
+  //     const res = await fetch(`${API_BASE}/public/report.pdf`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         companyName: data?.companyName || "",
+  //         companyLogo: data?.companyLogos || data?.companyLogo || "",
+  //         sections,
+  //       }),
+  //     });
+
+  //     if (!res.ok) throw new Error("PDF build failed");
+
+  //     const blob = await res.blob();
+  //     const urlObj = window.URL.createObjectURL(blob);
+  //     const a = document.createElement("a");
+  //     a.href = urlObj;
+  //     a.download = `${(data?.companyName || "report")
+  //       .replace(/[^a-z0-9-_]/gi, "_")
+  //       .toLowerCase()}.pdf`;
+
+  //     document.body.appendChild(a);
+  //     a.click();
+  //     a.remove();
+  //     window.URL.revokeObjectURL(urlObj);
+  //   } catch (e) {
+  //     console.error(e);
+  //   }
+  // };
 
 
   if (isLoading) {
@@ -689,4 +724,3 @@ export default function PublicSurveyPage() {
     </div>
   );
 }
-
