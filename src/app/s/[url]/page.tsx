@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import client from "../../../lib/client";
 import ThankYouCard from "@/components/ThankYouCard";
@@ -25,6 +25,14 @@ type PublicSurvey = {
   companyLogos?: string[];
   surveyName: string;
   segments: PublicSegment[];
+};
+
+type SurveyDraftV1 = {
+  v: 1;
+  updatedAt: string;
+  index: number;
+  questionId?: string | null;
+  answers: Record<string, string | string[]>;
 };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(
@@ -151,12 +159,85 @@ export default function PublicSurveyPage() {
   const [showThanks, setShowThanks] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
 
+  const draftKey = useMemo(() => `publicSurveyDraft:v1:${String(url)}`, [url]);
+  const hasHydratedDraftRef = useRef(false);
+
   const q = questions[index];
 
 
 
 
   const isLast = index === questions.length - 1;
+
+  useEffect(() => {
+    hasHydratedDraftRef.current = false;
+  }, [draftKey]);
+
+  // ---- draft restore (same device/browser) ----
+  useEffect(() => {
+    if (hasHydratedDraftRef.current) return;
+    if (!draftKey) return;
+    if (!questions.length) return;
+
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<SurveyDraftV1> | null;
+      if (!parsed || parsed.v !== 1 || typeof parsed !== "object") return;
+
+      const restoredAnswers =
+        parsed.answers && typeof parsed.answers === "object" ? parsed.answers : {};
+      setAnswers(restoredAnswers as Record<string, string | string[]>);
+
+      const byQuestionId =
+        parsed.questionId && typeof parsed.questionId === "string"
+          ? questions.findIndex((qq) => qq.id === parsed.questionId)
+          : -1;
+
+      const restoredIndexRaw =
+        byQuestionId >= 0
+          ? byQuestionId
+          : typeof parsed.index === "number"
+            ? parsed.index
+            : 0;
+
+      const restoredIndex = Math.min(
+        Math.max(0, Math.floor(restoredIndexRaw)),
+        Math.max(0, questions.length - 1)
+      );
+      setIndex(restoredIndex);
+    } catch (e) {
+      console.warn("Failed to restore survey draft:", e);
+    } finally {
+      hasHydratedDraftRef.current = true;
+    }
+  }, [draftKey, questions]);
+
+  // ---- draft autosave (debounced) ----
+  useEffect(() => {
+    if (!hasHydratedDraftRef.current) return;
+    if (!draftKey) return;
+    if (!questions.length) return;
+    if (showThanks) return;
+
+    const timeoutId = window.setTimeout(() => {
+      try {
+        const draft: SurveyDraftV1 = {
+          v: 1,
+          updatedAt: new Date().toISOString(),
+          index,
+          questionId: q?.id ?? null,
+          answers,
+        };
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch (e) {
+        console.warn("Failed to save survey draft:", e);
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [answers, draftKey, index, q?.id, questions.length, showThanks]);
 
   const logos = useMemo(() => {
     const arr =
@@ -231,239 +312,135 @@ export default function PublicSurveyPage() {
   // ----- submit -----
   const submit = useMutation({
     mutationFn: () => client.post(`/public/surveys/${url}/submit`, { answers }),
-    onSuccess: () => setShowThanks(true),
+    onSuccess: () => {
+      try {
+        window.localStorage.removeItem(draftKey);
+      } catch {
+        // ignore
+      }
+      setShowThanks(true);
+    },
   });
 
   const onNext = () => setIndex((i) => Math.min(i + 1, questions.length - 1));
   const onBack = () => setIndex((i) => Math.max(i - 1, 0));
   const onSubmit = () => submit.mutate();
-  const buildSections = () => {
-    if (!data) return [];
 
-    return data.segments
-      .map((seg) => {
-        const rows = seg.questions.map((qq) => {
-          let answersArr: string[] = [];
-          let risksArr: ("green" | "yellow" | "red")[] = [];
+ const buildSections = () => {
+  if (!data) return [];
 
-          // -------- TEXT --------
-          if (qq.type === "text") {
-            const a = String((answers[qq.id] as string) || "").trim();
-            if (a) {
-              answersArr = [a];
-              risksArr = ["green"];
-            }
+  return data.segments
+    .map((seg, sIdx) => {
+      const rows = seg.questions.map((qq) => {
+        let answersArr: string[] = [];
+        let risksArr: ("green" | "yellow" | "red")[] = [];
+        let selectedArr: boolean[] = [];
+
+        // -------- TEXT QUESTION --------
+        if (qq.type === "text") {
+          const a = String((answers[qq.id] as string) || "").trim();
+          if (a) {
+            answersArr = [a];
+            risksArr = ["green"];
+            selectedArr = [true];
           }
+        }
 
-          // -------- RADIO (only selected) --------
-          if (qq.type === "radio") {
-            const selectedIds = currentArr(qq.id);
+        // -------- RADIO --------
+        if (qq.type === "radio") {
+          const selectedIds = currentArr(qq.id);
 
-            const selectedOpt = qq.options.find((opt) =>
-              selectedIds.includes(opt.id)
-            );
+          const selectedOpt = qq.options.find((opt) =>
+            selectedIds.includes(opt.id)
+          );
 
-            if (selectedOpt) {
-              answersArr = [selectedOpt.text];
+          if (selectedOpt) {
+            answersArr = [selectedOpt.text];
+            selectedArr = [true];
 
-              const r = (selectedOpt.risk || "").toLowerCase();
-              risksArr = [
-                r === "green"
-                  ? "green"
-                  : r === "yellow" || r === "amber"
-                    ? "yellow"
-                    : "red",
-              ];
-            }
+            const r = (selectedOpt.risk || "").toLowerCase();
+            risksArr = [
+              r === "green"
+                ? "green"
+                : r === "yellow" || r === "amber"
+                ? "yellow"
+                : "red",
+            ];
           }
+        }
 
-          // -------- CHECKBOX (ONLY SELECTED) --------
-          if (qq.type === "checkbox") {
-            const selectedIds = currentArr(qq.id);
+        // -------- CHECKBOX --------
+       if (qq.type === "checkbox") {
+  const selectedIds = currentArr(qq.id);
 
-            qq.options.forEach((opt) => {
-              if (selectedIds.includes(opt.id)) {
-                answersArr.push(opt.text);
+  qq.options.forEach((opt) => {
+    const isSelected = selectedIds.includes(opt.id);
 
-                const r = (opt.risk || "").toLowerCase();
-                risksArr.push(
-                  r === "green"
-                    ? "green"
-                    : r === "yellow" || r === "amber"
-                      ? "yellow"
-                      : "red"
-                );
-              }
-            });
-          }
+    answersArr.push(opt.text);
+    selectedArr.push(isSelected);
 
-          return {
-            question: qq.text,
-            answers: answersArr,
-            risks: risksArr,
-          };
-        });
+    const r = (opt.risk || "").toLowerCase();
+
+    risksArr.push(
+      r === "green"
+        ? "green"
+        : r === "yellow" || r === "amber"
+        ? "yellow"
+        : "red"
+    );
+  });
+}
+
 
         return {
-          title: seg.title || "",
-          rows,
+          question: qq.text,
+          answers: answersArr,
+          risks: risksArr,
+          selected: selectedArr,
         };
-      })
-      .filter((sec) =>
-        sec.rows.some((r) => r.answers && r.answers.length > 0)
-      );
-  };
-
-  // const buildSections = () => {
-  //   if (!data) return [];
-
-  //   return data.segments
-  //     .map((seg, sIdx) => {
-  //       const rows = seg.questions.map((qq) => {
-  //         let answersArr: string[] = [];
-  //         let risksArr: ("green" | "yellow" | "red")[] = [];
-  //         let selectedArr: boolean[] = [];
-
-  //         // -------- TEXT QUESTION --------
-  //         if (qq.type === "text") {
-  //           const a = String((answers[qq.id] as string) || "").trim();
-  //           if (a) {
-  //             answersArr = [a];
-  //             risksArr = ["green"];
-  //             selectedArr = [true];
-  //           }
-  //         }
-
-  //         // -------- RADIO --------
-  //         if (qq.type === "radio") {
-  //           const selectedIds = currentArr(qq.id);
-
-  //           const selectedOpt = qq.options.find((opt) =>
-  //             selectedIds.includes(opt.id)
-  //           );
-
-  //           if (selectedOpt) {
-  //             answersArr = [selectedOpt.text];
-  //             selectedArr = [true];
-
-  //             const r = (selectedOpt.risk || "").toLowerCase();
-  //             risksArr = [
-  //               r === "green"
-  //                 ? "green"
-  //                 : r === "yellow" || r === "amber"
-  //                   ? "yellow"
-  //                   : "red",
-  //             ];
-  //           }
-  //         }
-
-  //         // -------- CHECKBOX --------
-  //         if (qq.type === "checkbox") {
-  //           const selectedIds = currentArr(qq.id);
-
-  //           qq.options.forEach((opt) => {
-  //             const isSelected = selectedIds.includes(opt.id);
-
-  //             answersArr.push(opt.text);
-  //             selectedArr.push(isSelected);
-
-  //             const r = (opt.risk || "").toLowerCase();
-
-  //             risksArr.push(
-  //               r === "green"
-  //                 ? "green"
-  //                 : r === "yellow" || r === "amber"
-  //                   ? "yellow"
-  //                   : "red"
-  //             );
-  //           });
-  //         }
-
-
-  //         return {
-  //           question: qq.text,
-  //           answers: answersArr,
-  //           risks: risksArr,
-  //           selected: selectedArr,
-  //         };
-  //       });
-
-  //       return {
-  //         title: seg.title || "",
-  //         rows,
-  //       };
-  //     })
-  //     .filter((sec) => sec.rows.length > 0);
-  // };
-
-
-
-  const handleDownloadPdf = async () => {
-    try {
-      const sections = buildSections();
-
-      const res = await fetch(`${API_BASE}/public/report.pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          surveyName: data?.surveyName || "",   // ✅ ADD THIS
-          companyName: data?.companyName || "",
-          companyLogo: data?.companyLogos || data?.companyLogo || "",
-          sections,
-        }),
       });
 
-      if (!res.ok) throw new Error("PDF build failed");
+      return {
+        title: seg.title || "",
+        rows,
+      };
+    })
+    .filter((sec) => sec.rows.length > 0);
+};
 
-      const blob = await res.blob();
-      const urlObj = window.URL.createObjectURL(blob);
 
-      const a = document.createElement("a");
-      a.href = urlObj;
-      a.download = `${(data?.companyName || "report")
-        .replace(/[^a-z0-9-_]/gi, "_")
-        .toLowerCase()}.pdf`;
+const handleDownloadPdf = async () => {
+  try {
+    const sections = buildSections();
 
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(urlObj);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-  // const handleDownloadPdf = async () => {
-  //   try {
-  //     const sections = buildSections();
+    const res = await fetch(`${API_BASE}/public/report.pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyName: data?.companyName || "",
+        companyLogo: data?.companyLogos || data?.companyLogo || "",
+        sections,
+      }),
+    });
 
-  //     const res = await fetch(`${API_BASE}/public/report.pdf`, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         companyName: data?.companyName || "",
-  //         companyLogo: data?.companyLogos || data?.companyLogo || "",
-  //         sections,
-  //       }),
-  //     });
+    if (!res.ok) throw new Error("PDF build failed");
 
-  //     if (!res.ok) throw new Error("PDF build failed");
+    const blob = await res.blob();
+    const urlObj = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = urlObj;
+    a.download = `${(data?.companyName || "report")
+      .replace(/[^a-z0-9-_]/gi, "_")
+      .toLowerCase()}.pdf`;
 
-  //     const blob = await res.blob();
-  //     const urlObj = window.URL.createObjectURL(blob);
-  //     const a = document.createElement("a");
-  //     a.href = urlObj;
-  //     a.download = `${(data?.companyName || "report")
-  //       .replace(/[^a-z0-9-_]/gi, "_")
-  //       .toLowerCase()}.pdf`;
-
-  //     document.body.appendChild(a);
-  //     a.click();
-  //     a.remove();
-  //     window.URL.revokeObjectURL(urlObj);
-  //   } catch (e) {
-  //     console.error(e);
-  //   }
-  // };
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(urlObj);
+  } catch (e) {
+    console.error(e);
+  }
+};
 
 
   if (isLoading) {
