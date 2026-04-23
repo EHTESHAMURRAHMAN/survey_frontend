@@ -46,6 +46,7 @@ type DisclaimerProps = {
 function Disclaimer({ onClose }: DisclaimerProps) {
   const [checked, setChecked] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [email, setEmail] = useState("");
   const { data: uiConfig, isLoading, error } = useQuery<SurveyUIConfig, Error>({
     queryKey: ["ui-config", "survey"],
     queryFn: async () => {
@@ -73,6 +74,13 @@ function Disclaimer({ onClose }: DisclaimerProps) {
   }, [uiConfig, isLoading, error]);
 
   const handleProceed = () => {
+    if (!email) {
+      alert("Please enter email");
+      return;
+    }
+
+    // Save temporarily (localStorage or state)
+    localStorage.setItem("auditUser", JSON.stringify({ email }));
     if (checked) {
       if (onClose) onClose();
     } else {
@@ -97,6 +105,19 @@ function Disclaimer({ onClose }: DisclaimerProps) {
         <p className="text-sm text-gray-800 mb-4 leading-snug">
           {uiConfig?.config?.disclaimer.text}
         </p>
+        <div className="space-y-3 mb-4">
+
+          {/* Email Input */}
+          <input
+            type="email"
+            placeholder={uiConfig?.config?.disclaimer?.emailFieldName || "Enter your email"}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border rounded px-3 py-2 text-sm"
+          />
+
+        </div>
+
         <label className="flex items-center mb-4 space-x-2">
           <input
             type="checkbox"
@@ -107,12 +128,17 @@ function Disclaimer({ onClose }: DisclaimerProps) {
           <span className="text-sm text-gray-800">{uiConfig?.config?.checkbox.text} </span>
         </label>
         <div className="flex justify-end space-x-2">
-          <button
-            onClick={handleProceed}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Proceed
-          </button>
+         <button
+  onClick={handleProceed}
+  disabled={!checked || !email}
+  className={`px-4 py-2 rounded text-white ${
+    !checked || !email
+      ? "bg-gray-400 cursor-not-allowed"
+      : "bg-blue-600 hover:bg-blue-700"
+  }`}
+>
+  Proceed
+</button>
         </div>
       </div>
       <div className="flex justify-center mt-6 pb-2">
@@ -310,137 +336,146 @@ export default function PublicSurveyPage() {
   }, [answers, q]);
 
   // ----- submit -----
-  const submit = useMutation({
-    mutationFn: () => client.post(`/public/surveys/${url}/submit`, { answers }),
-    onSuccess: () => {
-      try {
-        window.localStorage.removeItem(draftKey);
-      } catch {
-        // ignore
-      }
-      setShowThanks(true);
-    },
-  });
+ const submit = useMutation({
+  mutationFn: () => {
+    const user = JSON.parse(localStorage.getItem("auditUser") || "{}");
+
+    return client.post(`/public/surveys/${url}/submit`, {
+      answers,
+      name: user?.name,
+      email: user?.email,
+    });
+  },
+
+  onSuccess: () => {
+    try {
+      window.localStorage.removeItem(draftKey);
+    } catch {
+      // ignore
+    }
+    setShowThanks(true);
+  },
+});
 
   const onNext = () => setIndex((i) => Math.min(i + 1, questions.length - 1));
   const onBack = () => setIndex((i) => Math.max(i - 1, 0));
   const onSubmit = () => submit.mutate();
 
- const buildSections = () => {
-  if (!data) return [];
+  const buildSections = () => {
+    if (!data) return [];
 
-  return data.segments
-    .map((seg, sIdx) => {
-      const rows = seg.questions.map((qq) => {
-        let answersArr: string[] = [];
-        let risksArr: ("green" | "yellow" | "red")[] = [];
-        let selectedArr: boolean[] = [];
+    return data.segments
+      .map((seg, sIdx) => {
+        const rows = seg.questions.map((qq) => {
+          let answersArr: string[] = [];
+          let risksArr: ("green" | "yellow" | "red")[] = [];
+          let selectedArr: boolean[] = [];
 
-        // -------- TEXT QUESTION --------
-        if (qq.type === "text") {
-          const a = String((answers[qq.id] as string) || "").trim();
-          if (a) {
-            answersArr = [a];
-            risksArr = ["green"];
-            selectedArr = [true];
+          // -------- TEXT QUESTION --------
+          if (qq.type === "text") {
+            const a = String((answers[qq.id] as string) || "").trim();
+            if (a) {
+              answersArr = [a];
+              risksArr = ["green"];
+              selectedArr = [true];
+            }
           }
-        }
 
-        // -------- RADIO --------
-        if (qq.type === "radio") {
-          const selectedIds = currentArr(qq.id);
+          // -------- RADIO --------
+          if (qq.type === "radio") {
+            const selectedIds = currentArr(qq.id);
 
-          const selectedOpt = qq.options.find((opt) =>
-            selectedIds.includes(opt.id)
-          );
+            const selectedOpt = qq.options.find((opt) =>
+              selectedIds.includes(opt.id)
+            );
 
-          if (selectedOpt) {
-            answersArr = [selectedOpt.text];
-            selectedArr = [true];
+            if (selectedOpt) {
+              answersArr = [selectedOpt.text];
+              selectedArr = [true];
 
-            const r = (selectedOpt.risk || "").toLowerCase();
-            risksArr = [
-              r === "green"
-                ? "green"
-                : r === "yellow" || r === "amber"
-                ? "yellow"
-                : "red",
-            ];
+              const r = (selectedOpt.risk || "").toLowerCase();
+              risksArr = [
+                r === "green"
+                  ? "green"
+                  : r === "yellow" || r === "amber"
+                    ? "yellow"
+                    : "red",
+              ];
+            }
           }
-        }
 
-        // -------- CHECKBOX --------
-       if (qq.type === "checkbox") {
-  const selectedIds = currentArr(qq.id);
+          // -------- CHECKBOX --------
+          if (qq.type === "checkbox") {
+            const selectedIds = currentArr(qq.id);
 
-  qq.options.forEach((opt) => {
-    const isSelected = selectedIds.includes(opt.id);
+            qq.options.forEach((opt) => {
+              const isSelected = selectedIds.includes(opt.id);
 
-    answersArr.push(opt.text);
-    selectedArr.push(isSelected);
+              answersArr.push(opt.text);
+              selectedArr.push(isSelected);
 
-    const r = (opt.risk || "").toLowerCase();
+              const r = (opt.risk || "").toLowerCase();
 
-    risksArr.push(
-      r === "green"
-        ? "green"
-        : r === "yellow" || r === "amber"
-        ? "yellow"
-        : "red"
-    );
-  });
-}
+              risksArr.push(
+                r === "green"
+                  ? "green"
+                  : r === "yellow" || r === "amber"
+                    ? "yellow"
+                    : "red"
+              );
+            });
+          }
 
+
+          return {
+            question: qq.text,
+            answers: answersArr,
+            risks: risksArr,
+            selected: selectedArr,
+          };
+        });
 
         return {
-          question: qq.text,
-          answers: answersArr,
-          risks: risksArr,
-          selected: selectedArr,
+          title: seg.title || "",
+          rows,
         };
+      })
+      .filter((sec) => sec.rows.length > 0);
+  };
+
+
+  const handleDownloadPdf = async () => {
+    try {
+      const sections = buildSections();
+
+      const res = await fetch(`${API_BASE}/public/report.pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName: data?.companyName || "",
+          companyLogo: data?.companyLogos || data?.companyLogo || "",
+          sections,
+        }),
       });
 
-      return {
-        title: seg.title || "",
-        rows,
-      };
-    })
-    .filter((sec) => sec.rows.length > 0);
-};
+      if (!res.ok) throw new Error("PDF build failed");
 
+      const blob = await res.blob();
+      const urlObj = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = urlObj;
+      a.download = `${(data?.companyName || "report")
+        .replace(/[^a-z0-9-_]/gi, "_")
+        .toLowerCase()}.pdf`;
 
-const handleDownloadPdf = async () => {
-  try {
-    const sections = buildSections();
-
-    const res = await fetch(`${API_BASE}/public/report.pdf`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        companyName: data?.companyName || "",
-        companyLogo: data?.companyLogos || data?.companyLogo || "",
-        sections,
-      }),
-    });
-
-    if (!res.ok) throw new Error("PDF build failed");
-
-    const blob = await res.blob();
-    const urlObj = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = urlObj;
-    a.download = `${(data?.companyName || "report")
-      .replace(/[^a-z0-9-_]/gi, "_")
-      .toLowerCase()}.pdf`;
-
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(urlObj);
-  } catch (e) {
-    console.error(e);
-  }
-};
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(urlObj);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
 
   if (isLoading) {

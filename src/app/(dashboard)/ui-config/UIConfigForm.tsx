@@ -68,7 +68,7 @@ export default function UIConfigForm({
   const [config, setConfig] = useState<any>({
     backgroundImage: "",
     checkbox: { text: "" },
-    disclaimer: { text: "" },
+    disclaimer: { text: "", emailFieldName: "" },
     poweredBy: { logo: "" }
   });
 
@@ -88,7 +88,7 @@ export default function UIConfigForm({
         setConfig({
           backgroundImage: normalized.backgroundImage ?? "",
           checkbox: { text: normalized.checkbox?.text ?? "" },
-          disclaimer: { text: normalized.disclaimer?.text ?? "" },
+          disclaimer: { text: normalized.disclaimer?.text ?? "", emailFieldName: normalized.disclaimer?.emailFieldName ?? "" },
           poweredBy: { logo: normalized.poweredBy?.logo ?? "" }
         });
       } catch (err) {
@@ -197,6 +197,25 @@ export default function UIConfigForm({
               }))
             }
             placeholder="Enter checkbox label..."
+          />
+        </div>
+
+        {/* 🔹 Email Field Name */}
+        <div>
+          <label className="block font-medium text-gray-700 mb-2">
+            Email Field Name
+          </label>
+          <input
+            type="text"
+            className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            value={config.disclaimer.emailFieldName}
+            onChange={(e) =>
+              setConfig((prev: any) => ({
+                ...prev,
+                disclaimer: { ...prev.disclaimer, emailFieldName: e.target.value }
+              }))
+            }
+            placeholder="Enter email field label..."
           />
         </div>
 

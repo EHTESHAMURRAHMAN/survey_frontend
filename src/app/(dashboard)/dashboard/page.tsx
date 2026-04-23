@@ -4,12 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import client from "@/lib/client";
 import { FileText, HelpCircle, BarChart2, Bell } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 type Summary = {
   companiesCount: number;
   questionsCount: number;
   resultsCount: number;
   pendingCount: number;
+  totalAudits: number;
 };
 
 function Tile({
@@ -42,6 +44,22 @@ export default function DashboardPage() {
     queryFn: () => client.get<Summary>("/stats/summary"),
   });
 
+  const [datas, setDatas] = useState<Summary | null>(null);
+
+useEffect(() => {
+  const loadData = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/public/audits/summary`);
+      const data = await res.json();
+      setDatas(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  loadData();
+}, []);
+
   const fmt = (v?: number) => (isLoading ? "…" : (v ?? 0).toString());
 
   return (
@@ -49,27 +67,16 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Tile
           icon={<FileText className="h-12 w-12 text-[#0c5b67]" />}
-          title="Number of Companies"
+          title="Companies"
           value={fmt(data?.companiesCount)}
           href="/company"
         />
-        <Tile
-          icon={<HelpCircle className="h-12 w-12 text-[#0c5b67]" />}
-          title="Survey Questions"
-          value={fmt(data?.questionsCount)}
-          href="/questions"
-        />
+       
         <Tile
           icon={<BarChart2 className="h-12 w-12 text-[#0c5b67]" />}
-          title="Survey Results"
-          value={fmt(data?.resultsCount)}
+          title="Audits done "
+          value={datas ? datas?.totalAudits : "0"}
           href="/results"
-        />
-        <Tile
-          icon={<Bell className="h-12 w-12 text-[#0c5b67]" />}
-          title="Pending Feedback"
-          value={fmt(data?.pendingCount)}
-          href="/"
         />
       </div>
     </section>
