@@ -46,19 +46,19 @@ export default function DashboardPage() {
 
   const [datas, setDatas] = useState<Summary | null>(null);
 
-useEffect(() => {
-  const loadData = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/public/audits/summary`);
-      const data = await res.json();
-      setDatas(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/public/audits/summary`);
+        const data = await res.json();
+        setDatas(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
-  loadData();
-}, []);
+    loadData();
+  }, []);
 
   const fmt = (v?: number) => (isLoading ? "…" : (v ?? 0).toString());
 
@@ -71,7 +71,7 @@ useEffect(() => {
           value={fmt(data?.companiesCount)}
           href="/company"
         />
-       
+
         <Tile
           icon={<BarChart2 className="h-12 w-12 text-[#0c5b67]" />}
           title="Audits done "

@@ -28,7 +28,7 @@ export default function CompaniesSummary() {
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <table className="w-full text-left border-collapse">
-          
+
           <thead className="bg-gray-100">
             <tr>
               <th className="p-3 border">S.No</th>
