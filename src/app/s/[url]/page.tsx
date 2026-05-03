@@ -110,7 +110,7 @@ function Disclaimer({ onClose }: DisclaimerProps) {
           {/* Email Input */}
           <input
             type="email"
-            placeholder={(uiConfig?.config?.disclaimer as any)?.emailFieldName || "Enter your email"}
+            placeholder={uiConfig?.config?.disclaimer?.emailFieldName || "Enter your email"}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border rounded px-3 py-2 text-sm"
@@ -128,16 +128,17 @@ function Disclaimer({ onClose }: DisclaimerProps) {
           <span className="text-sm text-gray-800">{uiConfig?.config?.checkbox.text} </span>
         </label>
         <div className="flex justify-end space-x-2">
-          <button
-            onClick={handleProceed}
-            disabled={!checked || !email}
-            className={`px-4 py-2 rounded text-white ${!checked || !email
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-              }`}
-          >
-            Proceed
-          </button>
+         <button
+  onClick={handleProceed}
+  disabled={!checked || !email}
+  className={`px-4 py-2 rounded text-white ${
+    !checked || !email
+      ? "bg-gray-400 cursor-not-allowed"
+      : "bg-blue-600 hover:bg-blue-700"
+  }`}
+>
+  Proceed
+</button>
         </div>
       </div>
       <div className="flex justify-center mt-6 pb-2">
@@ -335,26 +336,26 @@ export default function PublicSurveyPage() {
   }, [answers, q]);
 
   // ----- submit -----
-  const submit = useMutation({
-    mutationFn: () => {
-      const user = JSON.parse(localStorage.getItem("auditUser") || "{}");
+ const submit = useMutation({
+  mutationFn: () => {
+    const user = JSON.parse(localStorage.getItem("auditUser") || "{}");
 
-      return client.post(`/public/surveys/${url}/submit`, {
-        answers,
-        name: user?.name,
-        email: user?.email,
-      });
-    },
+    return client.post(`/public/surveys/${url}/submit`, {
+      answers,
+      name: user?.name,
+      email: user?.email,
+    });
+  },
 
-    onSuccess: () => {
-      try {
-        window.localStorage.removeItem(draftKey);
-      } catch {
-        // ignore
-      }
-      setShowThanks(true);
-    },
-  });
+  onSuccess: () => {
+    try {
+      window.localStorage.removeItem(draftKey);
+    } catch {
+      // ignore
+    }
+    setShowThanks(true);
+  },
+});
 
   const onNext = () => setIndex((i) => Math.min(i + 1, questions.length - 1));
   const onBack = () => setIndex((i) => Math.max(i - 1, 0));

@@ -87,3 +87,6 @@ body {
     animation: spin-slow 14s linear infinite;
   }
 }
+.border-bottom{
+  border-bottom: 1px solid #e5e7eb;
+}

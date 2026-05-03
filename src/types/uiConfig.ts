@@ -2,7 +2,7 @@ export interface SurveyUIConfig {
   config: {
     backgroundImage: string;
     poweredBy: { logo: string };
-    disclaimer: { text: string, emailFieldName?: string; };
+    disclaimer: { text: string };
     checkbox: { text: string };
   }
 }

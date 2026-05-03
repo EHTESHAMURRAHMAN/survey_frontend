@@ -1,24 +1,20 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import client from "@/lib/client";
-import { FileText, HelpCircle, BarChart2, Bell } from "lucide-react";
+import { BarChart2, FileText } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type Summary = {
-  companiesCount: number;
-  questionsCount: number;
-  resultsCount: number;
-  pendingCount: number;
+type AuditSummary = {
   totalAudits: number;
+  totalCompanies: number;
+  companyStats: { company: string; count: number }[];
 };
 
 function Tile({
   icon,
   title,
   value,
-  href
+  href,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -32,35 +28,44 @@ function Tile({
         <div className="text-center text-[26px] font-extrabold leading-tight">
           {title}
         </div>
-        <div className="mt-2 text-center text-[32px] font-extrabold">{value}</div>
+        <div className="mt-2 text-center text-[32px] font-extrabold">
+          {value}
+        </div>
       </div>
     </Link>
   );
 }
 
-export default function DashboardPage() {
-  const { data, isLoading } = useQuery<Summary>({
-    queryKey: ["stats-summary"],
-    queryFn: () => client.get<Summary>("/stats/summary"),
-  });
+function publicApiUrl(path: string) {
+  const base = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/+$/, "");
+  return `${base}${path}`;
+}
 
-  const [datas, setDatas] = useState<Summary | null>(null);
+export default function DashboardPage() {
+  const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);
+  const [auditSummaryLoading, setAuditSummaryLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/public/audits/summary`);
+        const res = await fetch(publicApiUrl("/public/audits/summary"));
         const data = await res.json();
-        setDatas(data);
+        setAuditSummary(data);
       } catch (err) {
         console.error(err);
+      } finally {
+        setAuditSummaryLoading(false);
       }
     };
 
     loadData();
   }, []);
 
-  const fmt = (v?: number) => (isLoading ? "…" : (v ?? 0).toString());
+  const companiesStartedByCount =
+    auditSummary?.companyStats?.filter((item) => item.company?.trim().length > 0)
+      .length ??
+    auditSummary?.totalCompanies ??
+    0;
 
   return (
     <section className="space-y-6">
@@ -68,14 +73,14 @@ export default function DashboardPage() {
         <Tile
           icon={<FileText className="h-12 w-12 text-[#0c5b67]" />}
           title="Companies"
-          value={fmt(data?.companiesCount)}
-          href="/company"
+          value={auditSummaryLoading ? "..." : companiesStartedByCount}
+          href="/audits-started-by"
         />
 
         <Tile
           icon={<BarChart2 className="h-12 w-12 text-[#0c5b67]" />}
           title="Audits done "
-          value={datas ? datas?.totalAudits : "0"}
+          value={auditSummaryLoading ? "..." : auditSummary?.totalAudits ?? 0}
           href="/results"
         />
       </div>

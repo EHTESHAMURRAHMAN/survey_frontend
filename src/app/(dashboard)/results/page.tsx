@@ -8,7 +8,7 @@ type Company = { id: string; name: string };
 type Survey = { id: string; companyId: string; name: string };
 
 type ResultRow = {
-  id: string;
+  id?: string;
   companyId?: string;
   surveyId?: string;
   questionId?: string;
@@ -17,38 +17,44 @@ type ResultRow = {
   optionText?: string;
   type?: string;
   total?: number;
+  count?: number;
   percentage?: number; // 0..100
 };
 
+type DisplayRow = {
+  surveyId: string;
+  companyId: string;
+  surveyName: string;
+  companyName: string;
+  auditCount: number;
+};
+
 export default function SurveyResultsPage() {
-  // data
-  const { data: companies = [] } = useQuery<Company[]>({
+  const { data: companies = [], isLoading: companiesLoading } = useQuery<
+    Company[]
+  >({
     queryKey: ["companies"],
     queryFn: () => client.get("/companies"),
   });
-  const { data: surveys = [] } = useQuery<Survey[]>({
+
+  const { data: surveys = [], isLoading: surveysLoading } = useQuery<Survey[]>({
     queryKey: ["surveys"],
     queryFn: () => client.get("/surveys"),
   });
-  const { data: results = [] } = useQuery<ResultRow[]>({
+
+  const { data: results = [], isLoading: resultsLoading } = useQuery<
+    ResultRow[]
+  >({
     queryKey: ["results"],
     queryFn: () => client.get("/results"),
   });
 
-  // maps for quick name lookups
   const companyName = useMemo(() => {
     const m = new Map<string, string>();
     companies.forEach((c) => m.set(c.id, c.name));
     return (id?: string) => (id ? m.get(id) ?? "-" : "-");
   }, [companies]);
 
-  const surveyById = useMemo(() => {
-    const m = new Map<string, Survey>();
-    surveys.forEach((s) => m.set(s.id, s));
-    return (id?: string) => (id ? m.get(id) : undefined);
-  }, [surveys]);
-
-  // filters in the blue card
   const [filterCompanyId, setFilterCompanyId] = useState<string>("");
   const [filterSurveyId, setFilterSurveyId] = useState<string>("");
 
@@ -57,36 +63,34 @@ export default function SurveyResultsPage() {
     return surveys.filter((s) => s.companyId === filterCompanyId);
   }, [surveys, filterCompanyId]);
 
-  const label = useMemo(() => {
-    if (filterCompanyId) return "Company Name";
-    if (filterSurveyId) return "Survey Name";
-    return "";
-  }, [filterCompanyId, filterSurveyId]);
-
-  const displayData = useMemo(() => {
-    const map = new Map<string, number>();
+  const displayRows = useMemo<DisplayRow[]>(() => {
+    const auditCountsBySurvey = new Map<string, number>();
 
     results.forEach((r) => {
-      // 🔹 Company wise
-      if (filterCompanyId && r.companyId === filterCompanyId) {
-        map.set(r.companyId, (map.get(r.companyId) || 0) + 1);
-      }
-
-      // 🔹 Survey wise
-      if (filterSurveyId && r.surveyId === filterSurveyId) {
-        map.set(r.surveyId, (map.get(r.surveyId) || 0) + 1);
-      }
+      if (!r.surveyId) return;
+      const count = typeof r.count === "number" ? r.count : 1;
+      auditCountsBySurvey.set(
+        r.surveyId,
+        (auditCountsBySurvey.get(r.surveyId) || 0) + count
+      );
     });
 
-    return Array.from(map.entries()).map(([id, count]) => ({
-      id,
-      count,
-    }));
-  }, [results, filterCompanyId, filterSurveyId]);
+    return surveys
+      .filter((s) => !filterCompanyId || s.companyId === filterCompanyId)
+      .filter((s) => !filterSurveyId || s.id === filterSurveyId)
+      .map((s) => ({
+        surveyId: s.id,
+        companyId: s.companyId,
+        surveyName: s.name,
+        companyName: companyName(s.companyId),
+        auditCount: auditCountsBySurvey.get(s.id) || 0,
+      }));
+  }, [results, surveys, filterCompanyId, filterSurveyId, companyName]);
+
+  const isLoading = companiesLoading || surveysLoading || resultsLoading;
 
   return (
     <section className="space-y-6 overflow-x-hidden">
-      {/* Top filter card */}
       <div className="rounded-[18px] bg-[#bfe3df] p-6">
         <h2 className="mb-4 text-[24px] font-semibold">
           Survey Result By Company and Category
@@ -133,34 +137,61 @@ export default function SurveyResultsPage() {
         </div>
       </div>
 
-      {/* Results card */}
       <div className="rounded-[18px] bg-white p-6 shadow-[0_12px_40px_rgba(0,0,0,0.08)]">
-        <div className="mt-6">
-          {label ? (
-            <>
-              <h2 className="text-xl font-bold mb-4">{label}</h2>
+        <div className="overflow-hidden rounded-md border">
+          <table className="min-w-full">
+            <thead className="bg-gray-100">
+              <tr className="text-left text-[15px]">
+                <th className="px-4 py-3 font-semibold text-gray-700">S.No.</th>
+                <th className="px-4 py-3 font-semibold text-gray-700">
+                  Company Name
+                </th>
+                <th className="px-4 py-3 font-semibold text-gray-700">
+                  Survey Name
+                </th>
+                <th className="px-4 py-3 font-semibold text-gray-700">
+                  Audit Count
+                </th>
+              </tr>
+            </thead>
 
-              <div className="space-y-2">
-                {displayData.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between border-b pb-2 text-[16px]"
+            <tbody className="divide-y">
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-8 text-center text-gray-500"
                   >
-                    <span>{filterCompanyId ? companyName(item.id) : surveyById(item.id)?.name || ""}</span>
-                    <span className="font-semibold">{item.count}</span>
-                  </div>
-                ))}
-
-                {!displayData.length && (
-                  <div className="text-gray-500 text-sm">No data found</div>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="text-gray-500 text-sm">
-              Please select Company or Survey
-            </div>
-          )}
+                    Loading...
+                  </td>
+                </tr>
+              ) : displayRows.length ? (
+                displayRows.map((row, i) => (
+                  <tr key={row.surveyId} className="bg-white hover:bg-gray-50">
+                    <td className="px-4 py-4 text-[15px]">{i + 1}</td>
+                    <td className="px-4 py-4 text-[15px]">
+                      {row.companyName}
+                    </td>
+                    <td className="px-4 py-4 text-[15px]">
+                      {row.surveyName}
+                    </td>
+                    <td className="px-4 py-4 text-[15px] font-semibold">
+                      {row.auditCount}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
+                    No data found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
