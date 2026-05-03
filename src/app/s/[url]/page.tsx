@@ -110,7 +110,8 @@ function Disclaimer({ onClose }: DisclaimerProps) {
           {/* Email Input */}
           <input
             type="email"
-            placeholder={(uiConfig?.config?.disclaimer as any)?.emailFieldName || "Enter your email"} value={email}
+            placeholder={uiConfig?.config?.disclaimer?.emailFieldName || "Enter your email"}
+            value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border rounded px-3 py-2 text-sm"
           />
